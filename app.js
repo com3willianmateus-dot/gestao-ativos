@@ -3,7 +3,6 @@
    ========================================================= */
 const SUPABASE_URL = "https://ekdrkkjexsmuqededneu.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_OFX9DXZKIkebMqLYI5IjrA_Rzxe7-rA";
-
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.db = db;
@@ -23,7 +22,9 @@ function go(page) {
   }
 }
 
-/* ---------------- MENU ---------------- */
+/* =========================================================
+   MENU
+   ========================================================= */
 function toggleSubmenu(submenuId, arrowId) {
   const submenu = document.getElementById(submenuId);
   const arrow = document.getElementById(arrowId);
@@ -59,13 +60,16 @@ async function loadMenu() {
   }
 }
 
-/* ---------------- LOGIN / AUTH ---------------- */
+/* =========================================================
+   LOGIN / AUTH
+   ========================================================= */
 async function initLogin() {
   const loginForm = $("loginForm");
   if (!loginForm) return;
 
   loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
+
     const email = $("loginEmail").value.trim();
     const password = $("loginPassword").value;
     const message = $("loginMessage");
@@ -76,16 +80,18 @@ async function initLogin() {
     const result = await db.auth.signInWithPassword({ email, password });
 
     if (result.error) {
-      if (message) message.innerHTML = '<div class="message error">' + result.error.message + '</div>';
+      if (message) {
+        message.innerHTML = '<div class="message error">' + result.error.message + '</div>';
+      }
       if (button) { button.disabled = false; button.textContent = "Entrar"; }
       return;
     }
 
+    // Login OK → vai para a área protegida
     window.location.href = "busca_ativos.html";
   });
 }
 
-/* ---------------- AUTH ---------------- */
 async function requireAuth() {
   try {
     const { data, error } = await db.auth.getSession();
@@ -118,64 +124,14 @@ async function requireAuth() {
   }
 }
 
-/* ---------------- INIT ---------------- */
-document.addEventListener("DOMContentLoaded", async function () {
-  // Garante que o Supabase já está carregado (script do CDN pode atrasar)
-  if (typeof supabase === "undefined" || typeof db === "undefined") {
-    console.error("Supabase não carregado. Verifique o <script> do CDN.");
-    return;
-  }
-
-  const page = document.body.dataset.page || "";
-
-  // Se for a página de login, só inicializa o form e sai
-  if (page === "login" || document.getElementById("loginForm")) {
-    await initLogin();
-    return;
-  }
-
-  // Se for a home (index) → verifica sessão e redireciona
-  if (page === "home" || page === "index") {
-    const { data } = await db.auth.getSession();
-    if (data && data.session) {
-      // Já logado → vai direto pra área protegida
-      window.location.replace("busca_ativos.html");
-    } else {
-      // Não logado → vai pro login
-      window.location.replace("login.html");
-    }
-    return;
-  }
-
-  // Páginas protegidas → exige autenticação
-  const paginasProtegidas = [
-    "busca_ativos",
-  ];
-
-  if (paginasProtegidas.includes(page)) {
-    const auth = await requireAuth();
-    if (auth) {
-      await loadMenu();
-      if (page === "busca_ativos" && typeof initBuscaPage === "function") {
-        initBuscaPage();
-      }
-      if (page === "cadastro_ativo" && typeof initCadastroPage === "function") {
-        initCadastroPage();
-      }
-    }
-    return;
-  }
-
-  // Página desconhecida → manda pro login por segurança
-  window.location.replace("login.html");
-});
-
 async function logout() {
   await db.auth.signOut();
-  window.location.replace("index.html");
+  window.location.replace("login.html");
 }
 
-/* ---------------- BUSCA DE ATIVOS ---------------- */
+/* =========================================================
+   BUSCA DE ATIVOS
+   ========================================================= */
 /**
  * Busca ativos por TAG, serial ou contrato.
  * @param {string} termo - Termo digitado pelo usuário
@@ -202,22 +158,73 @@ async function buscarAtivos(termo) {
   return data || [];
 }
 
-/* ---------------- INIT ---------------- */
-document.addEventListener("DOMContentLoaded", async function () {
-  const page = document.body.dataset.page;
+/* =========================================================
+   APAGAR TODOS OS ATIVOS (admin)
+   ========================================================= */
+async function apagarTodosAtivos() {
+  if (!confirm("⚠️ Isso apagará TODOS os registros da tabela " + TABLE_ATIVOS + ".\n\nDeseja continuar?")) {
+    return;
+  }
+  if (!confirm("TEM CERTEZA? Esta ação NÃO pode ser desfeita.")) {
+    return;
+  }
 
-  if (page === "login" || $("loginForm")) {
+  const { error, count } = await db
+    .from(TABLE_ATIVOS)
+    .delete({ count: "exact" })
+    .gte("id", 0); // filtro que pega todos os registros
+
+  if (error) {
+    console.error("Erro ao apagar:", error);
+    alert("Erro ao apagar: " + error.message);
+    return;
+  }
+
+  alert(`✅ ${count} registros apagados com sucesso.`);
+  window.location.reload();
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+document.addEventListener("DOMContentLoaded", async function () {
+  // Garante que o Supabase já está carregado
+  if (typeof supabase === "undefined" || typeof db === "undefined") {
+    console.error("Supabase não carregado. Verifique o <script> do CDN antes do app.js.");
+    return;
+  }
+
+  const page = document.body.dataset.page || "";
+
+  // ---------- Página de LOGIN ----------
+  if (page === "login" || document.getElementById("loginForm")) {
     await initLogin();
     return;
   }
 
-  const paginasProtegidas = ["busca_ativos", "cadastro_ativo"];
+  // ---------- HOME / INDEX → verifica sessão e redireciona ----------
+  if (page === "home" || page === "index") {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) {
+      // Já logado → vai direto para a área protegida
+      window.location.replace("busca_ativos.html");
+    } else {
+      // Não logado → vai para o login
+      window.location.replace("login.html");
+    }
+    return;
+  }
+
+  // ---------- Páginas PROTEGIDAS ----------
+  const paginasProtegidas = [
+    "busca_ativos"
+  ];
 
   if (paginasProtegidas.includes(page)) {
     const auth = await requireAuth();
     if (auth) {
       await loadMenu();
-      // Se estiver na página de busca, inicializa
+
       if (page === "busca_ativos" && typeof initBuscaPage === "function") {
         initBuscaPage();
       }
@@ -227,4 +234,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     return;
   }
+
+  // ---------- Página desconhecida → manda para o login por segurança ----------
+  window.location.replace("login.html");
 });
