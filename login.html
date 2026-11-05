@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Ativos - Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="login">
+  <div class="login-container">
+    <h1>Gestão de Ativos</h1>
+    <form id="loginForm">
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" required placeholder="seu@email.com">
+
+      <label for="loginPassword">Senha</label>
+      <input type="password" id="loginPassword" required placeholder="••••••••">
+
+      <button type="submit">Entrar</button>
+    </form>
+    <div id="loginMessage"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

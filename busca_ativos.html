@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Busca de Ativos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="busca_ativos">
+
+  <header class="topbar">
+    <div id="menu"></div>
+    <div class="topbar-right">
+      <span id="userName"></span>
+      <button onclick="logout()" class="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Busca de Ativos</h1>
+    <p class="subtitle">Pesquise por <strong>TAG</strong>, <strong>Serial</strong> ou <strong>Contrato</strong>.</p>
+
+    <form id="buscaForm" class="busca-form">
+      <input
+        type="text"
+        id="buscaInput"
+        placeholder="Digite a TAG, Serial ou Contrato..."
+        autocomplete="off"
+        autofocus
+      >
+      <button type="submit">Buscar</button>
+      <button type="button" id="limparBtn" class="btn-secondary">Limpar</button>
+    </form>
+
+    <div id="buscaMensagem" class="message"></div>
+
+    <div id="resultadosWrapper" style="display:none;">
+      <h2>Resultados (<span id="resultadosCount">0</span>)</h2>
+      <div class="table-wrapper">
+        <table class="resultados-table">
+          <thead>
+            <tr>
+              <th>TAG</th>
+              <th>Serial</th>
+              <th>Contrato</th>
+            </tr>
+          </thead>
+          <tbody id="resultadosBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    function initBuscaPage() {
+      const form = document.getElementById("buscaForm");
+      const input = document.getElementById("buscaInput");
+      const limparBtn = document.getElementById("limparBtn");
+      const msg = document.getElementById("buscaMensagem");
+      const wrapper = document.getElementById("resultadosWrapper");
+      const tbody = document.getElementById("resultadosBody");
+      const count = document.getElementById("resultadosCount");
+
+      function renderResultados(lista) {
+        tbody.innerHTML = "";
+        count.textContent = lista.length;
+
+        if (!lista.length) {
+          wrapper.style.display = "none";
+          return;
+        }
+
+        lista.forEach(item => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(item.tag || "-")}</td>
+            <td>${escapeHtml(item.serial || "-")}</td>
+            <td>${escapeHtml(item.contrato || "-")}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        wrapper.style.display = "block";
+      }
+
+      function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, s => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;",
+          '"': "&quot;", "'": "&#39;"
+        }[s]));
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const termo = input.value.trim();
+
+        if (!termo) {
+          msg.innerHTML = '<div class="message error">Digite algo para buscar.</div>';
+          wrapper.style.display = "none";
+          return;
+        }
+
+        msg.innerHTML = '<div class="message info">Buscando...</div>';
+        wrapper.style.display = "none";
+
+        try {
+          const resultados = await buscarAtivos(termo);
+          if (!resultados.length) {
+            msg.innerHTML = '<div class="message warning">Nenhum ativo encontrado.</div>';
+          } else {
+            msg.innerHTML = "";
+          }
+          renderResultados(resultados);
+        } catch (err) {
+          msg.innerHTML = '<div class="message error">Erro ao buscar: ' + escapeHtml(err.message) + '</div>';
+        }
+      });
+
+      limparBtn.addEventListener("click", () => {
+        input.value = "";
+        msg.innerHTML = "";
+        wrapper.style.display = "none";
+        input.focus();
+      });
+    }
+  </script>
+</body>
+</html>
