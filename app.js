@@ -85,24 +85,90 @@ async function initLogin() {
   });
 }
 
+/* ---------------- AUTH ---------------- */
 async function requireAuth() {
-  const result = await db.auth.getSession();
+  try {
+    const { data, error } = await db.auth.getSession();
 
-  if (result.error || !result.data.session) {
-    window.location.replace("index.html");
+    if (error) {
+      console.error("Erro ao obter sessão:", error);
+      window.location.replace("login.html");
+      return false;
+    }
+
+    if (!data || !data.session) {
+      // Sem sessão → manda para o login
+      window.location.replace("login.html");
+      return false;
+    }
+
+    currentUser = data.session.user;
+    window.currentUser = currentUser;
+
+    const userNameElement = document.getElementById("userName");
+    if (userNameElement) {
+      userNameElement.textContent = currentUser.email || "Usuário Logado";
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Falha no requireAuth:", err);
+    window.location.replace("login.html");
     return false;
   }
+}
 
-  currentUser = result.data.session.user;
-  window.currentUser = currentUser;
-
-  const userNameElement = document.getElementById("userName");
-  if (userNameElement) {
-    userNameElement.textContent = currentUser.email || "Usuário Logado";
+/* ---------------- INIT ---------------- */
+document.addEventListener("DOMContentLoaded", async function () {
+  // Garante que o Supabase já está carregado (script do CDN pode atrasar)
+  if (typeof supabase === "undefined" || typeof db === "undefined") {
+    console.error("Supabase não carregado. Verifique o <script> do CDN.");
+    return;
   }
 
-  return true;
-}
+  const page = document.body.dataset.page || "";
+
+  // Se for a página de login, só inicializa o form e sai
+  if (page === "login" || document.getElementById("loginForm")) {
+    await initLogin();
+    return;
+  }
+
+  // Se for a home (index) → verifica sessão e redireciona
+  if (page === "home" || page === "index") {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) {
+      // Já logado → vai direto pra área protegida
+      window.location.replace("busca_ativos.html");
+    } else {
+      // Não logado → vai pro login
+      window.location.replace("login.html");
+    }
+    return;
+  }
+
+  // Páginas protegidas → exige autenticação
+  const paginasProtegidas = [
+    "busca_ativos",
+  ];
+
+  if (paginasProtegidas.includes(page)) {
+    const auth = await requireAuth();
+    if (auth) {
+      await loadMenu();
+      if (page === "busca_ativos" && typeof initBuscaPage === "function") {
+        initBuscaPage();
+      }
+      if (page === "cadastro_ativo" && typeof initCadastroPage === "function") {
+        initCadastroPage();
+      }
+    }
+    return;
+  }
+
+  // Página desconhecida → manda pro login por segurança
+  window.location.replace("login.html");
+});
 
 async function logout() {
   await db.auth.signOut();
